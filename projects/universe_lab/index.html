@@ -1,0 +1,214 @@
+<!doctype html><html lang='en'><head>
+<meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Universe Geometry — 2D/3D Toggle</title><link rel='stylesheet' href='../../assets/css/style.css'></head><body>
+<header class='nav'><div class='container'><a class='brand' href='../../index.html'>&larr; Back</a><button id='theme' class='btn'>Theme</button></div></header>
+<section class='container prose'>
+  <h2>Universe Geometry — 2D/3D Toggle</h2>
+  <p><strong>What you see:</strong> switch between infographic‑style 2D maps (spiral galaxy, light‑cone rings, cosmic web) and 3D starfields (sphere, torus, galaxy, void).</p>
+  <p><strong>How to use:</strong> choose a mode (2D/3D), pick a shape; tweak Count/Rotate/Noise/Spread and Arms (for galaxy); Regenerate to rebuild. Drag in 3D to orbit.</p>
+  
+<div class="controls">
+  <select id="mode"><option value="2d">2D</option><option value="3d">3D</option></select>
+  <select id="shape2d">
+    <option value="galaxy2d">Spiral Galaxy (2D)</option>
+    <option value="lightcone">Light‑Cone Rings</option>
+    <option value="web2d">Cosmic Web</option>
+  </select>
+  <select id="shape3d" style="display:none">
+    <option value="galaxy">Spiral Galaxy (3D)</option>
+    <option value="sphere">Sphere</option>
+    <option value="torus">Torus</option>
+    <option value="void">Random Void</option>
+  </select>
+  <label>Count <input id="count" type="range" min="500" max="7000" value="3000"></label>
+  <label>Rotate <input id="rot" type="range" min="0" max="3" step="0.01" value="0.5"></label>
+  <label>Noise <input id="noise" type="range" min="0" max="1.2" step="0.02" value="0.2"></label>
+  <label>Spread <input id="spread" type="range" min="0.2" max="2.0" step="0.02" value="1.0"></label>
+  <label>Arms <input id="arms" type="range" min="2" max="6" value="3"></label>
+  <select id="pal">
+    <option value="cool">Cool</option>
+    <option value="warm">Warm</option>
+    <option value="neon">Neon</option>
+  </select>
+  <button class="btn" id="regen">Regenerate</button>
+</div>
+<canvas id="univ" width="900" height="520" class="stage"></canvas>
+<p><small class="mono">Mode toggle: 2D infographic styles or 3D starfield. Drag in 3D to orbit.</small></p>
+
+</section>
+<footer><div class='container'>Contact: <a href='mailto:ambrosetheshield6@gmail.com'>ambrosetheshield6@gmail.com</a></div></footer>
+<script>document.getElementById('theme').onclick=()=>document.documentElement.classList.toggle('light');</script>
+
+<script>
+const cv=document.getElementById('univ'), ctx=cv.getContext('2d');
+let pts=[], rotX=0, rotY=0, dragging=false, lastX=0, lastY=0;
+cv.addEventListener('mousedown',e=>{dragging=true; lastX=e.clientX; lastY=e.clientY;});
+window.addEventListener('mouseup',()=>dragging=false);
+cv.addEventListener('mousemove',e=>{ if(!dragging) return; const dx=e.clientX-lastX, dy=e.clientY-lastY; rotY += dx*0.005; rotX += dy*0.005; lastX=e.clientX; lastY=e.clientY; });
+
+function R(){ return Math.random(); }
+function gaussian(){ let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+function palette(t){ const pal=document.getElementById('pal').value; let r,g,b;
+  if(pal==='cool'){ r=100+120*t; g=160+80*(1-t); b=220; }
+  if(pal==='warm'){ r=220; g=160*t; b=80*(1-t); }
+  if(pal==='neon'){ r=120+135*Math.sin(6*t); g=120+135*Math.sin(6*t+2); b=120+135*Math.sin(6*t+4); }
+  return [r|0,g|0,b|0];
+}
+function build(){
+  const mode=document.getElementById('mode').value;
+  document.getElementById('shape2d').style.display = mode==='2d' ? '' : 'none';
+  document.getElementById('shape3d').style.display = mode==='3d' ? '' : 'none';
+  const shape = mode==='2d' ? document.getElementById('shape2d').value : document.getElementById('shape3d').value;
+  const N=+document.getElementById('count').value;
+  const spread=+document.getElementById('spread').value;
+  const noise=+document.getElementById('noise').value;
+  const arms=+document.getElementById('arms').value;
+  pts=[];
+  if(mode==='2d'){
+    if(shape==='galaxy2d'){
+      // Flat spiral galaxy
+      const rad=220*spread, swirl=2.6;
+      for(let i=0;i<N;i++){
+        const r = rad*Math.pow(R(),0.6);
+        const arm=(i%arms)/arms;
+        const angle = arm*2*Math.PI + r/rad*swirl + gaussian()*0.15;
+        const x = cv.width/2 + r*Math.cos(angle) + gaussian()*noise*18;
+        const y = cv.height/2 + r*Math.sin(angle) + gaussian()*noise*18;
+        const t = r/rad;
+        pts.push({x,y,s:1.0-0.6*t, c:1-t, mode:'2d'});
+      }
+    } else if(shape==='lightcone'){
+      // Concentric rings wedge (infographic)
+      const cx=cv.width/2, cy=cv.height/2+40;
+      const maxR=Math.min(cv.width,cv.height)*0.46;
+      const rings=8;
+      // background fade
+      ctx.clearRect(0,0,cv.width,cv.height);
+      // pre-draw static rings each build (kept by redraw loop)
+      pts.push({static:true, draw:(ctx)=>{
+        ctx.clearRect(0,0,cv.width,cv.height);
+        ctx.strokeStyle='rgba(106,168,255,0.35)'; ctx.fillStyle='rgba(12,20,43,0.85)';
+        ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,maxR,-1.2, -0.35, false); ctx.closePath(); ctx.fill(); ctx.stroke();
+        for(let i=1;i<=rings;i++){
+          ctx.beginPath(); ctx.arc(cx,cy, (i/rings)*maxR, -1.2, -0.35); ctx.stroke();
+        }
+      }});
+      // stars along rings
+      for(let i=0;i<N;i++){
+        const r = (0.1+0.9*Math.pow(R(),1.2))*maxR;
+        const a = -1.2 + R()*0.85; // inside wedge
+        const x = cx + r*Math.cos(a) + gaussian()*noise*8;
+        const y = cy + r*Math.sin(a) + gaussian()*noise*8;
+        pts.push({x,y,s:0.8, c:1-r/maxR, mode:'2d'});
+      }
+    } else {
+      // Cosmic Web: random points + local connections, threshold modulated by simple noise
+      const nodes=[];
+      for(let i=0;i<N/4;i++){
+        nodes.push({x:R()*cv.width, y:R()*cv.height});
+      }
+      // compute nearest links
+      const links=[];
+      function vnoise(x,y){
+        return (Math.sin(x*0.01)+Math.sin(y*0.012)+Math.sin((x+y)*0.008))*0.33+0.5;
+      }
+      for(let i=0;i<nodes.length;i++){
+        const a=nodes[i]; const thresh = 60 + 80*vnoise(a.x,a.y)*spread*40;
+        for(let j=i+1;j<nodes.length;j++){
+          const b=nodes[j]; const d=Math.hypot(a.x-b.x,a.y-b.y);
+          if(d<thresh) links.push([i,j,d]);
+        }
+      }
+      pts.push({static:true, draw:(ctx)=>{
+        ctx.clearRect(0,0,cv.width,cv.height);
+        ctx.strokeStyle='rgba(106,168,255,0.25)';
+        ctx.lineWidth=1;
+        links.forEach(([i,j,d])=>{
+          const w = 1.2 - Math.min(1.1, d/120);
+          ctx.globalAlpha = 0.15 + 0.6*(1-d/120);
+          ctx.beginPath(); ctx.moveTo(nodes[i].x,nodes[i].y); ctx.lineTo(nodes[j].x,nodes[j].y); ctx.stroke();
+        });
+        ctx.globalAlpha=1;
+        ctx.fillStyle='#d9e6ff';
+        nodes.forEach(n=>{ ctx.beginPath(); ctx.arc(n.x,n.y,1.5,0,6.283); ctx.fill(); });
+      }});
+    }
+  } else {
+    // 3D shapes (previous)
+    if(shape==='sphere'){
+      const S=spread;
+      for(let i=0;i<N;i++){
+        const k = 2*i/N-1; const phi = i * (Math.PI * (3 - Math.sqrt(5))); const r = Math.sqrt(1-k*k);
+        let x = r*Math.cos(phi), y = k, z = r*Math.sin(phi); x*=S; y*=S; z*=S;
+        x+=noise*gaussian(); y+=noise*gaussian(); z+=noise*gaussian();
+        pts.push({x,y,z,c:(y+1)/2, mode:'3d'});
+      }
+    } else if(shape==='torus'){
+      const R=1.0*spread, r=0.4*spread;
+      for(let i=0;i<N;i++){
+        const u=2*Math.PI*(i/N), v=2*Math.PI*((i*1.618)%1);
+        let x=(R+r*Math.cos(v))*Math.cos(u), y=r*Math.sin(v), z=(R+r*Math.cos(v))*Math.sin(u);
+        x+=noise*gaussian(); y+=noise*gaussian(); z+=noise*gaussian();
+        pts.push({x,y,z,c:(Math.cos(v)*0.5+0.5), mode:'3d'});
+      }
+    } else if(shape==='galaxy'){
+      const armsN=+document.getElementById('arms').value, swirl=2.8*spread, rad=1.2*spread;
+      for(let i=0;i<N;i++){
+        const r = rad*Math.pow(R(),0.5);
+        const arm = (i%armsN)/armsN;
+        const angle = arm*2*Math.PI + r*swirl + gaussian()*0.15;
+        let x = r*Math.cos(angle) + gaussian()*noise*0.2;
+        let y = (gaussian()*0.05) + gaussian()*noise*0.1;
+        let z = r*Math.sin(angle) + gaussian()*noise*0.2;
+        const t = r/(rad+1e-6);
+        pts.push({x,y,z,c:1-t, mode:'3d'});
+      }
+    } else {
+      for(let i=0;i<N;i++){
+        let x=(R()*2-1)*spread, y=(R()*2-1)*spread, z=(R()*2-1)*spread;
+        if(Math.hypot(x,y,z)<0.4*spread) { i--; continue; }
+        x+=noise*gaussian(); y+=noise*gaussian(); z+=noise*gaussian();
+        const t = Math.min(1, Math.hypot(x,y,z)/spread);
+        pts.push({x,y,z,c:t, mode:'3d'});
+      }
+    }
+  }
+}
+function project3D(p){
+  const a=rotX, b=rotY;
+  let x=p.x, y=p.y, z=p.z;
+  let cy=Math.cos(a), sy=Math.sin(a), cz=Math.cos(b), sz=Math.sin(b);
+  let y1 = y*cy - z*sy, z1 = y*sy + z*cy;
+  let x2 = x*cz + z1*sz, z2 = -x*sz + z1*cz;
+  const d = 3.0, f = 360; const w = f/(d - z2);
+  return {x: cv.width/2 + x2*w, y: cv.height/2 + y1*w, w, depth:z2};
+}
+function draw(){
+  ctx.fillStyle='rgba(12,20,43,0.3)'; ctx.fillRect(0,0,cv.width,cv.height);
+  const mode=document.getElementById('mode').value;
+  const rot = +document.getElementById('rot').value;
+  if(mode==='3d'){ rotY += rot*0.002; }
+  // If there is a static layer (2D maps), draw it first
+  pts.filter(p=>p.static).forEach(p=>p.draw(ctx));
+  pts.filter(p=>!p.static).forEach(p=>{
+    if(p.mode==='3d'){
+      const pr = project3D(p);
+      const t = Math.max(0, Math.min(1, (pr.depth+2)/4 ));
+      const [r,g,b] = palette(p.c*0.7 + 0.3*t);
+      const size = Math.max(1, pr.w*1.2);
+      ctx.fillStyle = `rgba(${r},${g},${b},${0.8*t+0.2})`;
+      ctx.beginPath(); ctx.arc(pr.x, pr.y, size, 0, 6.283); ctx.fill();
+    } else {
+      const [r,g,b] = palette(p.c);
+      ctx.fillStyle = `rgba(${r},${g},${b},0.9)`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 1.2 + (p.s||0.6), 0, 6.283); ctx.fill();
+    }
+  });
+  requestAnimationFrame(draw);
+}
+document.getElementById('regen').onclick=()=>{build()};
+['shape2d','shape3d','mode','count','noise','spread','arms'].forEach(id=> document.getElementById(id).addEventListener('input', build));
+build(); draw();
+</script>
+
+</body></html>

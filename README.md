@@ -1,2 +1,12 @@
-# My_projects.
-A collection of interactive projects combining data analysis, algorithms, and visual simulations. Includes tools like Image Lab, Algo Path, Sort Lab, KMeans, Text Insight, Time Series Decomposition, and Universe Geometry with 2D/3D views. Built from scratch to showcase technical and creative skills.
+my__projects_ — seven-pack (2D/3D universe)
+
+Kept:
+- Image Lab
+- Flocking (Boids)
+- Falling Sand
+- TSP Studio
+- Force-Graph
+- Game of Life Studio
+
+Updated:
+- Universe Geometry now has a 2D/3D toggle with 2D presets (Spiral Galaxy, Light-Cone, Cosmic Web) and 3D presets (Sphere, Torus, Galaxy, Void).
